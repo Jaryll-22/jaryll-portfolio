@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QR Attendance + Room Booking System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; color: #333; min-height: 100vh; display: flex; flex-direction: column; align-items: center; background: url('alab.png') no-repeat center center fixed; background-size: cover; margin: 0;}
+    body::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.85); z-index: 0;}
+    header, .container { position: relative; z-index: 1; width: 100%; max-width: 900px; margin-left: auto; margin-right: auto;}
+    header { background-color: #fce4ec; border-bottom: 2px solid #f8bbd0; padding: 1rem; display: flex; align-items: center; justify-content: center; gap: 1rem;}
+    header img { height: 60px; width: auto;}
+    header h1 { font-size: 1.5rem; font-weight: bold; color: #880e4f; margin: 0;}
+    .container { background: #fff; border-radius: 1.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); padding: 2rem; margin: 2rem auto; border: 1px solid #f8bbd0; display: flex; flex-direction: column; align-items: center;}
+    .hidden { display: none; }
+    .message-box { padding: 0.75rem; margin-top: 1rem; border-radius: 0.5rem; text-align: center; font-weight: 500;}
+    .success { background: #c8e6c9; color: #256029; }
+    .error { background: #ffcdd2; color: #b71c1c; }
+    .info { background: #bbdefb; color: #0d47a1; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="meneses.png" alt="Bulacan State University Logo" />
+    <h1>Bulacan State University – Meneses Campus</h1>
+  </header>
+
+  <div class="container">
+    <h2 class="text-2xl font-bold text-pink-700 mb-6">QR Attendance + Room Booking System</h2>
+
+    <!-- Login Choice -->
+    <div id="role-choice" class="w-full text-center">
+      <button id="student-login-btn" class="bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 px-6 rounded-lg mr-2">Student Login</button>
+      <button id="admin-login-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">Professor/Admin Login</button>
+    </div>
+
+    <!-- Student Login -->
+    <div id="student-login" class="hidden w-full max-w-sm mt-6">
+      <button id="student-back-btn" class="mb-4 text-pink-700 hover:underline flex items-center">
+        &#8592; Back
+      </button>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Student ID</label>
+      <input id="student-id-input" type="text" placeholder="Enter ID (starts with 2024)"
+        class="w-full border border-pink-300 rounded-lg p-3 mb-2" />
+      <button id="student-login-submit" class="bg-pink-500 hover:bg-pink-600 text-white w-full py-2 rounded-lg">Log In</button>
+    </div>
+
+    <!-- Admin Login -->
+    <div id="admin-login" class="hidden w-full max-w-sm mt-6">
+      <button id="admin-back-btn" class="mb-4 text-gray-700 hover:underline flex items-center">
+        &#8592; Back
+      </button>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+      <input id="admin-password" type="password" placeholder="Enter admin password"
+        class="w-full border border-gray-300 rounded-lg p-3 mb-2" />
+      <button id="admin-login-submit" class="bg-gray-700 hover:bg-gray-800 text-white w-full py-2 rounded-lg">Log In</button>
+    </div>
+
+    <!-- Scanner Section (Student only) -->
+    <div id="scanner-section" class="hidden w-full text-center mt-6">
+      <p>Welcome <span id="current-student"></span>! Please scan your QR code:</p>
+      <button id="start-scan-btn" class="bg-pink-500 hover:bg-pink-600 text-white py-2 px-6 rounded-lg mt-3">Start Scanning</button>
+      <div id="qr-reader-section" class="hidden mt-4">
+        <div id="qr-reader" class="w-full border border-pink-300 rounded-lg"></div>
+      </div>
+    </div>
+
+    <!-- Attendance Logs -->
+    <div id="attendance-list-container" class="hidden w-full max-w-md mt-8">
+      <h3 class="text-xl font-semibold text-center text-pink-700 mb-2">Attendance Records</h3>
+      <ul id="attendance-list" class="bg-pink-50 rounded-lg p-4 max-h-64 overflow-y-auto border border-pink-200"></ul>
+    </div>
+
+    <!-- Room Dashboard -->
+    <div id="room-dashboard" class="hidden w-full max-w-md mt-8">
+      <div class="flex flex-col gap-3 mb-4 w-full">
+        <div class="flex justify-between items-center">
+          <h3 class="text-xl font-semibold text-pink-700">Room Status</h3>
+          <button id="back-btn" class="bg-gray-500 hover:bg-gray-600 text-white py-1 px-3 rounded-lg text-sm">Back</button>
+        </div>
+        <div class="flex flex-wrap gap-2 items-center">
+          <label class="text-sm text-gray-700">Status:</label>
+          <select id="room-filter" class="border border-gray-300 rounded-lg text-sm px-2 py-1">
+            <option value="all">All</option>
+            <option value="occupied">Occupied (now)</option>
+            <option value="vacant">Vacant (now)</option>
+          </select>
+
+          <span class="mx-2 h-5 w-px bg-gray-300"></span>
+
+          <label for="room-date" class="text-sm text-gray-700">Schedules on date:</label>
+          <input id="room-date" type="date" class="border border-gray-300 rounded-lg text-sm px-2 py-1" />
+          <button id="clear-date" class="text-sm px-2 py-1 border border-gray-300 rounded-lg hover:bg-gray-100">Clear</button>
+        </div>
+      </div>
+
+      <ul id="room-list" class="bg-gray-50 rounded-lg p-4 border border-gray-200"></ul>
+
+      <!-- Room Booking Form (admins) -->
+      <div id="room-booking" class="hidden w-full mt-4 p-4 border border-gray-300 rounded-lg bg-gray-100">
+        <h4 class="text-lg font-semibold mb-2">Book a Room</h4>
+        <input id="prof-name" type="text" placeholder="Professor Name"
+          class="w-full border border-gray-300 rounded-lg p-2 mb-2" />
+        <input id="room-id-input" type="text" placeholder="Room ID (e.g., Room101)"
+          class="w-full border border-gray-300 rounded-lg p-2 mb-2" />
+        <label class="block text-sm font-medium mb-1">Start Time</label>
+        <input id="start-time" type="datetime-local"
+          class="w-full border border-gray-300 rounded-lg p-2 mb-2" />
+        <label class="block text-sm font-medium mb-1">End Time</label>
+        <input id="end-time" type="datetime-local"
+          class="w-full border border-gray-300 rounded-lg p-2 mb-2" />
+        <button id="book-room-btn" class="bg-blue-600 hover:bg-blue-700 text-white w-full py-2 rounded-lg">Book Room</button>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notifications" class="hidden w-full max-w-md mt-6 bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+      <h4 class="text-lg font-semibold text-yellow-800 mb-2">Notifications</h4>
+      <ul id="notification-list" class="space-y-2 text-sm text-yellow-700"></ul>
+    </div>
+
+    <!-- Messages -->
+    <div id="message" class="w-full max-w-sm message-box hidden"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+    import { 
+      getFirestore, collection, addDoc, query, orderBy, onSnapshot, where, 
+      serverTimestamp, getDocs 
+    } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "qrcode-8f645.firebaseapp.com",
+      projectId: "qrcode-8f645",
+      storageBucket: "qrcode-8f645.firebasestorage.app",
+      messagingSenderId: "394907962178",
+      appId: "1:394907962178:web:e639d0f41305fa50de56db"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // DOM
+    const roleChoice = document.getElementById("role-choice");
+    const studentLogin = document.getElementById("student-login");
+    const adminLogin = document.getElementById("admin-login");
+    const scannerSection = document.getElementById("scanner-section");
+    const attendanceContainer = document.getElementById("attendance-list-container");
+    const attendanceList = document.getElementById("attendance-list");
+    const roomDashboard = document.getElementById("room-dashboard");
+    const roomList = document.getElementById("room-list");
+    const roomBooking = document.getElementById("room-booking");
+    const bookRoomBtn = document.getElementById("book-room-btn");
+    const notifications = document.getElementById("notifications");
+    const notificationList = document.getElementById("notification-list");
+    const messageBox = document.getElementById("message");
+    const currentStudentSpan = document.getElementById("current-student");
+    const roomFilter = document.getElementById("room-filter");
+    const backBtn = document.getElementById("back-btn");
+    const roomDate = document.getElementById("room-date");
+    const clearDateBtn = document.getElementById("clear-date");
+    const studentBackBtn = document.getElementById("student-back-btn");
+    const adminBackBtn = document.getElementById("admin-back-btn");
+
+    let currentStudentId = null;
+    let isAdmin = false;
+    let allRooms = [];
+    let shownNotifs = {};
+    const adminPassword = "MENESES";
+
+    // Login controls
+    document.getElementById("student-login-btn").onclick = () => {
+      roleChoice.classList.add("hidden");
+      studentLogin.classList.remove("hidden");
+    };
+    document.getElementById("admin-login-btn").onclick = () => {
+      roleChoice.classList.add("hidden");
+      adminLogin.classList.remove("hidden");
+    };
+    backBtn.onclick = () => location.reload();
+
+    // Back button for Student Login
+    studentBackBtn.onclick = () => {
+      studentLogin.classList.add("hidden");
+      roleChoice.classList.remove("hidden");
+      document.getElementById("student-id-input").value = "";
+      messageBox.classList.add("hidden");
+    };
+
+    // Back button for Admin Login
+    adminBackBtn.onclick = () => {
+      adminLogin.classList.add("hidden");
+      roleChoice.classList.remove("hidden");
+      document.getElementById("admin-password").value = "";
+      messageBox.classList.add("hidden");
+    };
+
+    // Student Login
+    document.getElementById("student-login-submit").onclick = () => {
+      const studentId = document.getElementById("student-id-input").value.trim();
+      if (!studentId.startsWith("2024")) {
+        showMessage("Invalid Student ID. Must start with 2024.", "error");
+        return;
+      }
+      currentStudentId = studentId;
+      currentStudentSpan.textContent = studentId;
+      studentLogin.classList.add("hidden");
+      scannerSection.classList.remove("hidden");
+      attendanceContainer.classList.remove("hidden");
+      roomDashboard.classList.remove("hidden");
+      notifications.classList.remove("hidden");
+      listenToAttendance(studentId);
+      listenToRooms();
+      showMessage("Login successful! Scan your QR code.", "success");
+    };
+
+    // Admin Login
+    document.getElementById("admin-login-submit").onclick = () => {
+      const pass = document.getElementById("admin-password").value.trim();
+      if (pass === adminPassword) {
+        isAdmin = true;
+        adminLogin.classList.add("hidden");
+        scannerSection.classList.add("hidden");
+        attendanceContainer.classList.remove("hidden");
+        roomDashboard.classList.remove("hidden");
+        roomBooking.classList.remove("hidden");
+        notifications.classList.remove("hidden");
+        listenToAttendance();
+        listenToRooms();
+        showMessage("Admin login successful. You can now book rooms.", "success");
+      } else {
+        showMessage("Invalid admin password.", "error");
+      }
+    };
+
+    // Book Room (multiple schedules + conflict check)
+    bookRoomBtn.onclick = async () => {
+      const professor = (document.getElementById("prof-name").value || "").trim();
+      const roomId = (document.getElementById("room-id-input").value || "").trim();
+      const start = document.getElementById("start-time").value;
+      const end = document.getElementById("end-time").value;
+
+      if (!professor || !roomId || !start || !end) {
+        showMessage("Please fill all fields!", "error");
+        return;
+      }
+
+      const newStart = new Date(start);
+      const newEnd = new Date(end);
+
+      try {
+        const schedulesRef = collection(db, "rooms", roomId, "schedules");
+        const snapshot = await getDocs(schedulesRef);
+
+        let conflict = false;
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const existingStart = new Date(data.scheduleStart);
+          const existingEnd = new Date(data.scheduleEnd);
+          if (newStart < existingEnd && newEnd > existingStart) {
+            conflict = true;
+          }
+        });
+
+        if (conflict) {
+          showMessage(`❌ Room ${roomId} is already occupied during that schedule.`, "error");
+          return;
+        }
+
+        await addDoc(schedulesRef, {
+          professor,
+          scheduleStart: start,
+          scheduleEnd: end,
+          createdAt: serverTimestamp()
+        });
+
+        showMessage(`✅ Room ${roomId} booked for ${professor}`, "success");
+      } catch (err) {
+        console.error(err);
+        showMessage("Failed to book room.", "error");
+      }
+    };
+
+    // Attendance
+    function listenToAttendance(studentId = null) {
+      let q;
+      if (studentId) {
+        q = query(collection(db, "attendance"), where("studentId", "==", studentId), orderBy("timestamp", "desc"));
+      } else {
+        q = query(collection(db, "attendance"), orderBy("timestamp", "desc"));
+      }
+      onSnapshot(q, (snapshot) => {
+        attendanceList.innerHTML = "";
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const time = data.timestamp?.toDate().toLocaleString() || "Pending";
+          const li = document.createElement("li");
+          li.textContent = `${data.studentId} - ${data.qrCode} (${time})`;
+          li.className = "py-1 border-b border-pink-200 text-sm text-gray-700";
+          attendanceList.appendChild(li);
+        });
+      });
+    }
+
+    // Rooms + Schedules
+    function listenToRooms() {
+      onSnapshot(collection(db, "rooms"), async (snapshot) => {
+        allRooms = [];
+        for (const roomDoc of snapshot.docs) {
+          const roomId = roomDoc.id;
+          const schedulesRef = collection(db, "rooms", roomId, "schedules");
+          const schedulesSnap = await getDocs(schedulesRef);
+          const schedules = [];
+          schedulesSnap.forEach((s) => schedules.push(s.data()));
+          allRooms.push({ id: roomId, schedules });
+        }
+        renderRooms();
+        checkNotifications();
+      });
+    }
+
+    // Helpers for date filtering
+    function startOfDay(dStr) { return new Date(`${dStr}T00:00:00`); }
+    function endOfDay(dStr)   { return new Date(`${dStr}T23:59:59.999`); }
+
+    // Render Rooms (supports live view OR date-filtered view)
+    function renderRooms() {
+      roomList.innerHTML = "";
+      const now = new Date();
+      const filter = roomFilter.value;
+      const dateStr = roomDate.value?.trim();
+
+      allRooms.forEach((room) => {
+        const schedulesSorted = room.schedules
+          .slice()
+          .sort((a, b) => new Date(a.scheduleStart) - new Date(b.scheduleStart));
+
+        // If a date is selected, show schedules for that date
+        if (dateStr) {
+          const dayStart = startOfDay(dateStr);
+          const dayEnd = endOfDay(dateStr);
+
+          const daySchedules = schedulesSorted.filter(s => {
+            const st = new Date(s.scheduleStart);
+            const en = new Date(s.scheduleEnd);
+            // overlap with day range
+            return st <= dayEnd && en >= dayStart;
+          });
+
+          const li = document.createElement("li");
+          li.className = "py-2 border-b border-gray-200 text-sm";
+
+          if (daySchedules.length === 0) {
+            li.innerHTML = `<span class="text-blue-700 font-semibold">${room.id} - No classes on ${new Date(dayStart).toLocaleDateString()}</span>`;
+          } else {
+            li.innerHTML = `<span class="text-purple-700 font-semibold">${room.id} - Scheduled on ${new Date(dayStart).toLocaleDateString()}</span>`;
+            const ul = document.createElement("ul");
+            ul.className = "mt-1 ml-4 list-disc";
+            daySchedules.forEach(s => {
+              const st = new Date(s.scheduleStart).toLocaleTimeString();
+              const en = new Date(s.scheduleEnd).toLocaleTimeString();
+              const item = document.createElement("li");
+              item.textContent = `Prof. ${s.professor} • ${st} - ${en}`;
+              ul.appendChild(item);
+            });
+            li.appendChild(ul);
+          }
+          roomList.appendChild(li);
+          return; // skip live logic if date filter is active
+        }
+
+        // Live (no date selected): show Occupied/Vacant now + next
+        let status = "Vacant";
+        let active = null;
+        let nextSchedule = null;
+
+        schedulesSorted.forEach((s) => {
+          const start = new Date(s.scheduleStart);
+          const end = new Date(s.scheduleEnd);
+          if (now >= start && now < end) {
+            status = "Occupied";
+            active = s;
+          } else if (start > now && !nextSchedule) {
+            nextSchedule = s;
+          }
+        });
+
+        // Apply live status filter
+        if (filter !== "all" && filter !== status.toLowerCase()) return;
+
+        const li = document.createElement("li");
+        li.className = "py-2 border-b border-gray-200 text-sm";
+
+        if (status === "Occupied") {
+          li.innerHTML = `<span class="text-green-700 font-semibold">${room.id} - Occupied</span> 
+            | Prof: ${active.professor} 
+            | ${new Date(active.scheduleStart).toLocaleTimeString()} - ${new Date(active.scheduleEnd).toLocaleTimeString()}`;
+        } else {
+          li.innerHTML = `<span class="text-red-600 font-semibold">${room.id} - Vacant</span>`;
+        }
+
+        if (nextSchedule) {
+          li.innerHTML += `<br><span class="text-gray-600 text-xs">Next: Prof. ${nextSchedule.professor} at ${new Date(nextSchedule.scheduleStart).toLocaleTimeString()}</span>`;
+        }
+
+        roomList.appendChild(li);
+      });
+    }
+
+    // Notifications (live, independent of date filter)
+    function checkNotifications() {
+      const now = new Date();
+      notificationList.innerHTML = "";
+      let hasNotifs = false;
+
+      allRooms.forEach((room) => {
+        const sortedSchedules = room.schedules
+          .slice()
+          .sort((a, b) => new Date(a.scheduleStart) - new Date(b.scheduleStart));
+
+        sortedSchedules.forEach((s, idx) => {
+          const start = new Date(s.scheduleStart);
+          const end = new Date(s.scheduleEnd);
+          const notifId = `${room.id}-${idx}`;
+          const minsLeft = (end - now) / 60000;
+          const minsBeforeStart = (start - now) / 60000;
+
+          // Current class ending soon
+          if (now >= start && now < end && minsLeft <= 5 && !shownNotifs[notifId + "-warn"]) {
+            const li = document.createElement("li");
+            li.textContent = `⚠️ Prof. ${s.professor}, your class in ${room.id} ends in ${Math.ceil(minsLeft)} minutes.`;
+            notificationList.appendChild(li);
+            shownNotifs[notifId + "-warn"] = true;
+            hasNotifs = true;
+          }
+
+          // Room became vacant
+          if (now >= end && !shownNotifs[notifId + "-vacant"]) {
+            const li = document.createElement("li");
+            li.textContent = `✅ ${room.id} is now vacant (last used by Prof. ${s.professor}).`;
+            notificationList.appendChild(li);
+            shownNotifs[notifId + "-vacant"] = true;
+            hasNotifs = true;
+          }
+
+          // Next professor reminder (5 mins before start)
+          if (minsBeforeStart <= 5 && minsBeforeStart > 0 && !shownNotifs[notifId + "-next"]) {
+            const li = document.createElement("li");
+            li.textContent = `📢 Prof. ${s.professor}, your class in ${room.id} will begin in ${Math.ceil(minsBeforeStart)} minutes.`;
+            notificationList.appendChild(li);
+            shownNotifs[notifId + "-next"] = true;
+            hasNotifs = true;
+          }
+        });
+      });
+
+      notifications.classList.toggle("hidden", !hasNotifs);
+    }
+
+    // Reactive UI: filters & date
+    roomFilter.onchange = renderRooms;
+    roomDate.onchange = renderRooms;
+    clearDateBtn.onclick = () => { roomDate.value = ""; renderRooms(); };
+
+    // Refresh live views every minute
+    setInterval(() => {
+      renderRooms();
+      checkNotifications();
+    }, 60000);
+
+    // Utility
+    function showMessage(msg, type) {
+      messageBox.textContent = msg;
+      messageBox.className = `message-box ${type}`;
+      messageBox.classList.remove("hidden");
+    }
+  </script>
+</body>
+</html>
